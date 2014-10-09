@@ -1,0 +1,38 @@
+#!/software/bin/python
+
+#
+# Given a host, pid, and cfg_name
+# of a running p4 (viv) program, read the configuration file
+#
+
+import sys
+import cgi
+import json
+import subprocess
+
+data = {}
+json_data = json.dumps('')
+form = cgi.FieldStorage()
+pid = form.getvalue('pid')
+host = form.getvalue('host')
+cfg_name = form.getvalue('cfg_name')
+
+cmd = "ssh -x -o StrictHostKeyChecking=no " + host + ' sudo -u srpipe lsof -p' + pid + ' -a  -d cwd | grep -v COMMAND | tr -s "\t " "\t" | cut -f 9'
+dir_name = subprocess.check_output(cmd,shell=True).rstrip()
+
+sys.stderr.write("CMD = "+cmd)
+sys.stderr.write("DIR = "+dir_name)
+
+vtf_file=open(dir_name + '/' + cfg_name)
+vtf_data = json.load(vtf_file)
+vtf_file.close()
+
+data['vtf_data'] = vtf_data
+data['logdir'] = dir_name
+
+json_data = json.dumps(data)
+
+print "Content-Type: application/json"
+print ""
+print json_data
+

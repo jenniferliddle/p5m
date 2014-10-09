@@ -1,0 +1,53 @@
+#!/software/bin/python
+
+#
+# Given a host, pid, and cfg_name
+# of a running p4 (viv) program, collect the status information
+#
+
+import cgi
+import json
+import subprocess
+import glob
+import sys
+import re
+
+json_data = json.dumps('')
+form = cgi.FieldStorage()
+pid = form.getvalue('pid')
+host = form.getvalue('host')
+cfg_name = form.getvalue('cfg_name')
+logdir = form.getvalue('logdir') + '/'
+
+log_files = glob.glob(logdir+'*.err')
+
+nodes = {}
+data = {}
+
+for log_file in log_files:
+    matches = re.match(logdir+'(.*)\.(\d*)\.err',log_file)
+    if (matches):
+        pid = matches.group(2)
+        cmd = ("ssh","-x","-o","StrictHostKeyChecking=no",host,"sudo","-u","srpipe", "ps", "--no-heading", "-o", "command", "-p", pid)
+        try:
+            output = subprocess.check_output(cmd)
+            m1 = re.search("pending",output)
+            # Job is currently running
+            status = 2
+            if (m1):
+                # Job is waiting for I/O
+                status = 1
+        except:
+            # Job has completed
+            status = 0
+
+        nodes[matches.group(1)] = status
+
+
+data['nodes'] = nodes
+json_data = json.dumps(data)
+
+print "Content-Type: application/json"
+print ""
+print json_data
+

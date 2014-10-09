@@ -1,0 +1,68 @@
+#!/software/bin/python
+
+#
+# Search the farm for instances of viv (p4) and return a list
+# in JSON format
+#
+
+import subprocess
+import json
+import cgi
+import sys
+
+cmd = "bjobs -r -w -u srpipe | cut -d' ' -f10 | sed -e 's/.*\*//' | uniq"
+hosts = subprocess.check_output(cmd,shell=True).split()
+
+print "Content-Type: text/html"
+print ""
+
+table = []
+
+# Check each host for instances of viv (p4)
+for host in hosts:
+   if (host == "QUEUE"):
+      continue
+   cmd = "ssh -x -o StrictHostKeyChecking=no " + host + " ps ax -o pid,etime,command | grep viv.pl | grep -v pending | grep -v bash"
+   try:
+      vivs = subprocess.check_output(cmd,shell=True).split("\n")
+   except:
+      continue
+   for viv in vivs:
+      if (viv != ''):
+         row = {}
+         data = viv.split()
+         row['host'] = host
+         row['pid'] = data[0]
+         row['etime'] = data[1]
+         row['cfg_name'] = data[-1]
+         while (len(row['etime']) < 12):
+            row['etime'] = ' ' + row['etime']
+         table.append(row)
+
+if (len(table) == 0):
+   print "<div>"
+   print "<br/>"
+   print "<p>There are no P4 processes currently running</p>"
+   print "<br/>"
+   print "</div>"
+else:
+   table.sort(key = lambda r: r['etime'], reverse=True)
+   print "<table id=t class='zebra sortable' cellspacing=5 cellpadding=5>"
+   print "<tr>"
+   print "<th>Configuration</th>"
+   print "<th>PID</th>"
+   print "<th>Host Node</th>"
+   print "<th>Elapsed Time</th>"
+   for row in table:
+      print "<tr>"
+      print "<td>"
+      print "<a href=view.html?pid=" + row['pid'] + "&host=" + row['host'] + "&cfg_name=" + row['cfg_name'] + ">", 
+      print row['cfg_name']
+      print "</a>"
+      print "</td>"
+      print "<td>", row['pid'], "</td>"
+      print "<td>", row['host'], "</td>"
+      print "<td>", row['etime'], "</td>"
+      print "</tr>"
+   print "</table>"
+
